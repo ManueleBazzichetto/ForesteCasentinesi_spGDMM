@@ -1,0 +1,16 @@
+# Ignore folders
+
+DisturbanceData/
+MOTIVATE_for_mac/
+Old_scripts/
+Shape_FCas/
+TopographicData/
+VegetationData/
+
+# Ignore files
+
+.RData
+.Rhistory
+climatic_data_per_plot.RData
+data_all.RData
+GDM_ForesteCasentinesi.Rproj
