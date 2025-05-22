@@ -14,3 +14,7 @@ VegetationData/
 climatic_data_per_plot.RData
 data_all.RData
 GDM_ForesteCasentinesi.Rproj
+
+# Ignore RStudio project files
+*.Rproj
+.Rproj.user/
