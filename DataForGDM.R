@@ -562,5 +562,7 @@ plot(Site_geodist, Rspat_offd_temp)
 
 #------------------------------------Export input data to project for fitting spGDMM
 
-
+#check date of object creation for reference
+save(Obs_Z, X_for_GDM, N_col_XforGDM, row_ind, col_ind, Smp_size, N_sites, R_inv, Site_geodist,
+     file = '/MOTIVATE/GDM_ForesteCasentinesi/spGDMM_fold/Data_for_spGDMM.RData')
 
