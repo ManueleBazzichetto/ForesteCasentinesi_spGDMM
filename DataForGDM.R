@@ -439,32 +439,42 @@ Z_along_geodist <- ggplot(Z_geodist.df, aes(x = GeoDist, y = Z)) +
 #bin distances in categories - 5km step
 Z_geodist.df$GeoDist_cat <- with(Z_geodist.df, cut(GeoDist, breaks = c(seq(0, 35, by = 5), 42), labels = F)) 
 
-Aggr_Z_geodist.df <- data.frame(Mean_Z = with(Z_geodist.df, tapply(Z, INDEX = GeoDist_cat, mean)),
-                                Var_Z = with(Z_geodist.df, tapply(Z, INDEX = GeoDist_cat, var)),
-                                Dist_cat = paste0('Cat_', names(with(Z_geodist.df, tapply(Z, INDEX = GeoDist_cat, var)))))
+#compute mean and variance of log-Beta dissimilarity (scale of latent Z) - these are conditional mean and variance | distance
+Aggr_Z_geodist.df <- data.frame(Mean_Z = with(Z_geodist.df, tapply(log(Z), INDEX = GeoDist_cat, mean)),
+                                Var_Z = with(Z_geodist.df, tapply(log(Z), INDEX = GeoDist_cat, var)),
+                                Dist_cat = paste0('Cat_', names(with(Z_geodist.df, tapply(log(Z), INDEX = GeoDist_cat, var)))))
 
 #plot mean and variance of Z as a function of distance
-ggplot(Aggr_Z_geodist.df, aes(x = Dist_cat, y = log(Mean_Z), group = 1)) +
+ggplot(Aggr_Z_geodist.df, aes(x = Dist_cat, y = Mean_Z, group = 1)) +
   geom_line(lwd = 1) +
   geom_point(size = 4, col = 'green') +
-  ylab('Mean Beta-dissimilarity (log scale)') + xlab('Distance class') +
+  ylab('Mean log-Beta dissimilarity') + xlab('Distance class') +
   theme_pubr() +
   theme(axis.text.x.bottom = element_text(size = 12),
         axis.title = element_text(size = 14))
 
-ggplot(Aggr_Z_geodist.df, aes(x = Dist_cat, y = log(Var_Z), group = 1)) +
+ggplot(Aggr_Z_geodist.df, aes(x = Dist_cat, y = Var_Z, group = 1)) +
   geom_line(lwd = 1) +
   geom_point(size = 4, col = 'red') +
-  ylab('Variance Beta-dissimilarity (log)') + xlab('Distance class') +
+  ylab('Variance log-Beta dissimilarity') + xlab('Distance class') +
   theme_pubr() +
   theme(axis.text.x.bottom = element_text(size = 12),
         axis.title = element_text(size = 14))
 
-#plot conditional mean against conditional variance
-ggplot(Aggr_Z_geodist.df, aes(x = Mean_Z, y = log(Var_Z), group = 1)) +
+#plot marginal mean against marginal variance
+#create .1 bins of Z and compute mean and variance within them
+#this should replicate figure A.1 in White's supp material
+
+Z_geodist.df$Z_bins <- with(Z_geodist.df, cut(Z, breaks = seq(0, 1, by = .1)))
+
+Aggr_Z.df <- data.frame(Mean_Z = as.numeric(with(Z_geodist.df, tapply(Z, INDEX = Z_bins, mean))),
+                        Var_Z = as.numeric(with(Z_geodist.df, tapply(log(Z), INDEX = Z_bins, var))),
+                        Z_bin = names(with(Z_geodist.df, tapply(Z, INDEX = Z_bins, mean))))
+
+ggplot(Aggr_Z.df, aes(x = Mean_Z, y = Var_Z, group = 1)) +
   geom_line(lwd = 1) +
   geom_point(size = 4, col = 'red') +
-  ylab('Variance Beta-dissimilarity (log)') + xlab('Mean Beta-dissimilarity') +
+  ylab('Variance log-Beta dissimilarity') + xlab('Mean Beta dissimilarity') +
   theme_pubr() +
   theme(axis.text.x.bottom = element_text(size = 12),
         axis.title = element_text(size = 14))
