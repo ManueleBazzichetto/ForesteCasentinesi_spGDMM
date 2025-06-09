@@ -186,7 +186,7 @@ Hab_types <- c("~" = "unclassified", "T" = "Forest", "T19" = "Temp.sub.thermoph.
   "T11" = "Temp.Salix.Populus.riparian.forest", "U38" = "Medit.base.rich.inland.cliff", "S35,S53" = "Mix.of.scrub.35_53",
   "S31" = "Lowland.to.mont.temp.submed.Juniperus.scrub", "R57" = "Herbaceous.forest.clearing.veget",
   "U23" = "Temp.lowland.to.mont.siliceous.scree", "R52" = "Forest.fringe.acidic.nutrient.poor.soils",
-  "R56" = " Mont.to.subalp.moist.wet.tall.herb.fern.fringe", "Qb" = "Wetlands", "Q52" = "Small.helophyte.bed",
+  "R56" = "Mont.to.subalp.moist.wet.tall.herb.fern.fringe", "Qb" = "Wetlands", "Q52" = "Small.helophyte.bed",
   "R35" = "Moist.wet.mesotroph.to.eutroph.hay.meadow", "Pa" = "Brackish.water.veget.", "T17" = "Fagus.forest.on.non.acid.soils") 
 
 Hab_types.df <- data.frame(Hab_nm = unname(Hab_types),
@@ -265,6 +265,66 @@ sum(Forcas_env$`ReSurvey plot (Y/N)` == "Y") #75
 #drop resurveyed plots
 Forcas_env <- Forcas_env[Forcas_env$`ReSurvey plot (Y/N)` != "Y", ]
 
+#------------------------------------drop plots that are too close in the geographical space
+
+#plots that are too close in space can lead to an ill-conditioned Kernel matrix,
+#with negative consequences on the convergence of MCMC
+#drop out plots that are too close in the geographical space
+
+#create distance matrix
+geo_distmat_preliminary <- distm(cbind(Forcas_env$lon, Forcas_env$lat))/1000
+
+#check how many plots are within a given minimum distance
+which((geo_distmat_preliminary + diag(1, nrow = nrow(geo_distmat_preliminary))) < 0.05, arr.ind = T)
+
+#filtering out plots below 100 meters implies about 15 plots less
+too_close_to_drop <- which((geo_distmat_preliminary + diag(1, nrow = nrow(geo_distmat_preliminary))) < 0.1, arr.ind = T)
+
+#choose plots to drop
+#166 vs. 3; 149 vs. 5; 167 vs. 7; 148 vs. 57; 152 vs. 57; 199 vs. 62; 158 vs. 67; 72 vs. 71; 163 vs. 94;
+#297 vs. 107; 172 vs. 117; 156 vs. 148; 155 vs. 152; 297 vs. 159; 263 vs. 178 
+
+too_close_vec <- c(166, 3, 149, 5, 167, 7, 148, 57, 152, 57, 199, 62, 158, 67, 72, 71, 163, 94,
+                   297, 107, 172, 117, 156, 148, 155, 152, 297, 159, 263, 178)
+
+#check which plot occurs more than once
+too_close_vec[duplicated(too_close_vec)] #57 148 152 297 - these will be dropped first as they relate with more than a plot
+
+#create vector with PlotIDs to drop
+too_close_ids <- Forcas_env[sort(c(57, 148, 152, 297)), 'PlotObservationID']
+
+#first exclude plots that occur more than once - this leaves with the following pairs:
+#166 vs. 3; 149 vs. 5; 167 vs. 7; 199 vs. 62; 158 vs. 67; 72 vs. 71; 163 vs. 94;
+#172 vs. 117; 263 vs. 178
+
+#drop 1) smaller (in terms of plot size) plots and 2) older
+Forcas_env[c(3, 166), ] #drop 394503
+Forcas_env[c(5, 149), ] #drop 394505
+Forcas_env[c(7, 167), ] #drop 394507
+Forcas_env[c(62, 199), ] #drop 397030
+Forcas_env[c(67, 158), ] #drop 394804
+Forcas_env[c(71, 72), ] #drop 394588
+Forcas_env[c(94, 163), ] #drop 394809
+Forcas_env[c(117, 172), ] #drop 394818
+Forcas_env[c(178, 263), ] #drop 394827
+
+#13 plots are eventually dropped
+too_close_ids <- c(too_close_ids, 394503, 394505, 394507, 397030, 394804, 394588, 394809, 394818, 394827)
+
+#drop the plots from Forcas_env and Forcas_sp
+Forcas_env <- Forcas_env[!Forcas_env$PlotObservationID %in% too_close_ids, ]
+
+Forcas_sp <- Forcas_sp[!Forcas_sp$PlotObservationID %in% too_close_ids, ]
+
+#recompute preliminary distance matrix to check new distances
+geo_distmat_preliminary <- distm(cbind(Forcas_env$lon, Forcas_env$lat))/1000
+
+#check
+which((geo_distmat_preliminary + diag(1, nrow = nrow(geo_distmat_preliminary))) < 0.1, arr.ind = T) #ok
+
+#delete distance matrix - a new distance matrix will be created below when generating input data for spGDMM
+rm(geo_distmat_preliminary)
+
 #------------------------------------match species data
 
 Forcas_sp <- Forcas_sp[Forcas_sp$PlotObservationID %in% Forcas_env$PlotObservationID, ]
@@ -287,7 +347,7 @@ duply_species <- sapply(unique(Forcas_sp$PlotObservationID), function(id) {
 }) 
 
 #how many cases? 
-sum(duply_species) #11
+sum(duply_species) #10
 
 duply_sp_id <- names(which(duply_species)) 
 
@@ -310,14 +370,13 @@ Forcas_sp[Forcas_sp$PlotObservationID == duply_sp_id[7] & Forcas_sp$`Matched con
 Forcas_sp[Forcas_sp$PlotObservationID == duply_sp_id[8] & Forcas_sp$`Matched concept corrected` %in% duply_species_in_plot[[8]], ]
 Forcas_sp[Forcas_sp$PlotObservationID == duply_sp_id[9] & Forcas_sp$`Matched concept corrected` %in% duply_species_in_plot[[9]], ]
 Forcas_sp[Forcas_sp$PlotObservationID == duply_sp_id[10] & Forcas_sp$`Matched concept corrected` %in% duply_species_in_plot[[10]], ]
-Forcas_sp[Forcas_sp$PlotObservationID == duply_sp_id[11] & Forcas_sp$`Matched concept corrected` %in% duply_species_in_plot[[11]], ]
 
 #example
 duply_cov.ex <- Forcas_sp[Forcas_sp$PlotObservationID == duply_sp_id[1] & Forcas_sp$`Matched concept corrected` %in% duply_species_in_plot[[1]], 'Cover %']
 
 combine.cover(duply_cov.ex) #88.36
 
-#combine cover - the for loop should drop sum(lengths(duply_species_in_plot)) observations (22)
+#combine cover - the for loop should drop sum(lengths(duply_species_in_plot)) observations (21)
 for(i in names(duply_species_in_plot)) {
   sp_to_comb <- duply_species_in_plot[[i]]
   for(j in sp_to_comb) {
@@ -349,7 +408,7 @@ colnames(Forcas_sp) <- c('ID', 'Species_name', 'Cover_perc')
 #check range of cover values
 range(Forcas_sp$Cover_perc) #0.1 - 98.00 (no NA)
 anyNA(Forcas_sp$Cover_perc) #F
-length(unique(Forcas_sp$Species_name)) #561
+length(unique(Forcas_sp$Species_name)) #541
 
 #from wide to long format
 fcas_spec_mat <- as.data.frame(tidyr::pivot_wider(data = Forcas_sp, names_from = 'Species_name', values_from = 'Cover_perc', values_fill = 0))
@@ -398,13 +457,13 @@ range(Obs_Z) #0.015 - 1 [no 0 dissimilarity]
 Perf_Z <- which(Obs_Z == 1)
 
 NonPerf_Z <- which(Obs_Z != 1)
-N_nonperfZ <- length(NonPerf_Z) #37085
+N_nonperfZ <- length(NonPerf_Z) #34730
 
 #how many 1s
-N_perfZ <- length(Perf_Z) #7466
+N_perfZ <- length(Perf_Z) #6025
 #prop of 1s
-N_perfZ/Smp_size #17%
-mean(Obs_Z == 1) #17%
+N_perfZ/Smp_size #15%
+mean(Obs_Z == 1) #15%
 
 #check
 (N_nonperfZ + N_perfZ) == Smp_size #T
@@ -419,7 +478,7 @@ geo_distmat <- distm(cbind(fcas_loc_mat$lon, fcas_loc_mat$lat))/1000
 Site_geodist <- geo_distmat[upper.tri(geo_distmat)]
 
 #check range
-range(Site_geodist) #0.03 - 41.6 km
+range(Site_geodist) #0.10 - 41.6 km
 
 #------------------Exploratory analysis: how does Z changes along geo distance
 
@@ -505,7 +564,7 @@ X_for_GDM <- do.call(cbind, lapply(seq_len(ncol(I_spl_basisfun)), function(i) {
   })) 
 
 #check nrow(X_for_GDM) - (nrow(I_spl_basisfun)*(nrow(I_spl_basisfun) - 1))/2
-nrow(X_for_GDM) #44551
+nrow(X_for_GDM) #40755
 
 #compute basis functions for geographical distances
 Basis_geodist <- iSpline(Site_geodist, degree = (Spl_deg - 1), df = Spl_df, intercept = TRUE)
@@ -558,6 +617,9 @@ R_spat <- exp(-geo_distmat/Rho_fix)
 
 #check if R_spat is postive-definite - it must be invertible!
 all(eigen(R_spat)$val > 0) #TRUE
+
+#check if R_spat is ill-conditioned
+max(eigen(R_spat)$val)/min(eigen(R_spat)$val) #3200
 
 #Cholesky decomposition
 R_chol <- t(chol(R_spat))
