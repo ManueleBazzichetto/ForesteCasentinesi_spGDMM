@@ -275,14 +275,14 @@ Forcas_env <- Forcas_env[Forcas_env$`ReSurvey plot (Y/N)` != "Y", ]
 geo_distmat_preliminary <- distm(cbind(Forcas_env$lon, Forcas_env$lat))/1000
 
 #check how many plots are within a given minimum distance
-which((geo_distmat_preliminary + diag(1, nrow = nrow(geo_distmat_preliminary))) < 0.075, arr.ind = T) #3 plots
+which((geo_distmat_preliminary + diag(1, nrow = nrow(geo_distmat_preliminary))) < 0.05, arr.ind = T) #3 plots
 
 #filtering out plots below 75 meters means losing about 8 plots
-min_dist <- 75/1000 #in km
+min_dist <- 50/1000 #in km
 
 too_close_to_drop <- which((geo_distmat_preliminary + diag(1, nrow = nrow(geo_distmat_preliminary))) < min_dist, arr.ind = T)
 
-#sort entries of too_close_to_drop so that I can identiy duplicates
+#sort entries of too_close_to_drop so that I can identify duplicates
 for(i in seq_len(nrow(too_close_to_drop))) {
   too_close_to_drop[i, ] <- sort(too_close_to_drop[i, ])
 }
@@ -428,7 +428,7 @@ colnames(Forcas_sp) <- c('ID', 'Species_name', 'Cover_perc')
 #check range of cover values
 range(Forcas_sp$Cover_perc) #0.1 - 98.00 (no NA)
 anyNA(Forcas_sp$Cover_perc) #F
-length(unique(Forcas_sp$Species_name)) #546
+length(unique(Forcas_sp$Species_name)) #547
 
 #from wide to long format
 fcas_spec_mat <- as.data.frame(tidyr::pivot_wider(data = Forcas_sp, names_from = 'Species_name', values_from = 'Cover_perc', values_fill = 0))
@@ -448,7 +448,7 @@ colnames(fcas_loc_mat)[1] <- 'ID'
 
 fcas_env_use <- Forcas_env[c('tmean_avg', 'prcp_avg', 'slope', 'east', 'TCW')]
 
-cor(fcas_env_use)
+cor(fcas_env_use) # note that redundancy of basis functions could still happen even if cor among predictors is low
 
 
 #check if PlotID order is the same between species, location and env mat
@@ -477,10 +477,10 @@ range(Obs_Z) #0.015 - 1 [no 0 dissimilarity]
 Perf_Z <- which(Obs_Z == 1)
 
 NonPerf_Z <- which(Obs_Z != 1)
-N_nonperfZ <- length(NonPerf_Z) #35595
+N_nonperfZ <- length(NonPerf_Z) #36655
 
 #how many 1s
-N_perfZ <- length(Perf_Z) #6600
+N_perfZ <- length(Perf_Z) #7005
 #prop of 1s
 N_perfZ/Smp_size #16%
 mean(Obs_Z == 1) #16%
@@ -498,7 +498,7 @@ geo_distmat <- distm(cbind(fcas_loc_mat$lon, fcas_loc_mat$lat))/1000
 Site_geodist <- geo_distmat[upper.tri(geo_distmat)]
 
 #check range
-range(Site_geodist) #0.077 - 41.6 km
+range(Site_geodist) #0.05 - 41.6 km
 
 #------------------Exploratory analysis: how does Z changes along geo distance
 
@@ -564,7 +564,9 @@ ggplot(Aggr_Z.df, aes(x = Mean_Z, y = Var_Z, group = 1)) +
 X_mat <- fcas_env_use
 
 #define number of knots and degrees for building splines
-Spl_deg <- 3
+#I am setting spl_deg to 2 as an ill-conditioned matrix of basis splines, together with an ill-conditioned R_inv, can create problems with MCMC
+#geographical distance is probably redundant with other predictors - using too flexible splines may induce ill-conditioned X_for_GDM
+Spl_deg <- 2
 Spl_knots <- 1
 Spl_df <- Spl_deg + Spl_knots
 
@@ -584,7 +586,7 @@ X_for_GDM <- do.call(cbind, lapply(seq_len(ncol(I_spl_basisfun)), function(i) {
   })) 
 
 #check nrow(X_for_GDM) - (nrow(I_spl_basisfun)*(nrow(I_spl_basisfun) - 1))/2
-nrow(X_for_GDM) #42195
+nrow(X_for_GDM) #43660
 
 #compute basis functions for geographical distances
 Basis_geodist <- iSpline(Site_geodist, degree = (Spl_deg - 1), df = Spl_df, intercept = TRUE)
@@ -629,7 +631,16 @@ row_ind <- tmp[upper.tri(tmp)] # 1 - 1, 2 - 1, 2, 3 - ..
 
 #rho = 1/phi
 #phi controls how quickly covariance among sites decays with distance
-#here 10 is used for scaling - this parameter can be estimated in the model
+#this parameter can be estimated in the model
+
+#check symmetry of R_inv before setting rho
+sapply(1:30, function(i) {
+  rho_scaling <- max(geo_distmat)/i
+  r_spatial <- exp(-geo_distmat/rho_scaling)
+  return(isSymmetric((1/0.001) * solve(r_spatial))) #here 0.001 simulate a very low sigma2_psi
+})
+
+#using a scaling factor of 20 for Rho_fix to avoid issues with non-symmetric prec_use in case of a very low sigma2_psi
 Rho_fix <- max(geo_distmat)/10
 
 #compute Kernel matrix
@@ -639,13 +650,17 @@ R_spat <- exp(-geo_distmat/Rho_fix)
 all(eigen(R_spat)$val > 0) #TRUE
 
 #check if R_spat is ill-conditioned
-max(eigen(R_spat)$val)/min(eigen(R_spat)$val) #4921.655
+max(eigen(R_spat)$val)/min(eigen(R_spat)$val) #5763.057
 
 #Cholesky decomposition
 R_chol <- t(chol(R_spat))
 
 #take inverse of R_spat
 R_inv <- solve(R_spat)
+
+#check symmetry of R_inv - a non symmetric R_inv, which can happen in case of numerical instability due to ill-conditioned R_spat
+#create problems to MCMC - note that a non symmetric prec_use matrix (see nimble_model4) may be caused by a too low sigma2_psi
+isSymmetric(R_inv) #
 
 #check how covariance decays with distance
 Rspat_offd_temp <- R_spat[upper.tri(R_spat)]
