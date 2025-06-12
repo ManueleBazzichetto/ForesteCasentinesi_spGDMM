@@ -634,13 +634,15 @@ row_ind <- tmp[upper.tri(tmp)] # 1 - 1, 2 - 1, 2, 3 - ..
 #this parameter can be estimated in the model
 
 #check symmetry of R_inv before setting rho
+#this suggests prec_use won't be symmetric as long as scaling factor <= 17
+#this may lead problems with MCMC - warnings such as AF_slice reaching max contraction -> complex eigenvectors, see nimEigen()
 sapply(1:30, function(i) {
   rho_scaling <- max(geo_distmat)/i
   r_spatial <- exp(-geo_distmat/rho_scaling)
   return(isSymmetric((1/0.001) * solve(r_spatial))) #here 0.001 simulate a very low sigma2_psi
 })
 
-#using a scaling factor of 20 for Rho_fix to avoid issues with non-symmetric prec_use in case of a very low sigma2_psi
+#I am anyway setting the scaling factor to 10 - White also uses a non-symmetric R_inv in code of South African datasets - species level
 Rho_fix <- max(geo_distmat)/10
 
 #compute Kernel matrix
@@ -660,7 +662,7 @@ R_inv <- solve(R_spat)
 
 #check symmetry of R_inv - a non symmetric R_inv, which can happen in case of numerical instability due to ill-conditioned R_spat
 #create problems to MCMC - note that a non symmetric prec_use matrix (see nimble_model4) may be caused by a too low sigma2_psi
-isSymmetric(R_inv) #
+isSymmetric(R_inv) #F
 
 #check how covariance decays with distance
 Rspat_offd_temp <- R_spat[upper.tri(R_spat)]
