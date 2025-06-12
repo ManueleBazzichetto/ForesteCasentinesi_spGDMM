@@ -642,17 +642,17 @@ sapply(1:30, function(i) {
   return(isSymmetric((1/0.001) * solve(r_spatial))) #here 0.001 simulate a very low sigma2_psi
 })
 
-#I am anyway setting the scaling factor to 10 - White also uses a non-symmetric R_inv in code of South African datasets - species level
-Rho_fix <- max(geo_distmat)/10
+#I am setting the scaling factor to 20 - but note that White used a non-symmetric R_inv in code of South African dataset - species level
+Rho_fix <- max(geo_distmat)/20
 
 #compute Kernel matrix
 R_spat <- exp(-geo_distmat/Rho_fix)
 
-#check if R_spat is postive-definite - it must be invertible!
+#check if R_spat is positive-definite - it must be invertible!
 all(eigen(R_spat)$val > 0) #TRUE
 
 #check if R_spat is ill-conditioned
-max(eigen(R_spat)$val)/min(eigen(R_spat)$val) #5763.057
+max(eigen(R_spat)$val)/min(eigen(R_spat)$val) #1395.815
 
 #Cholesky decomposition
 R_chol <- t(chol(R_spat))
@@ -662,7 +662,7 @@ R_inv <- solve(R_spat)
 
 #check symmetry of R_inv - a non symmetric R_inv, which can happen in case of numerical instability due to ill-conditioned R_spat
 #create problems to MCMC - note that a non symmetric prec_use matrix (see nimble_model4) may be caused by a too low sigma2_psi
-isSymmetric(R_inv) #F
+isSymmetric(R_inv) #T
 
 #check how covariance decays with distance
 Rspat_offd_temp <- R_spat[upper.tri(R_spat)]
