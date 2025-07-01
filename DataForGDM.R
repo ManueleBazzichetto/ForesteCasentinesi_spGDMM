@@ -678,6 +678,6 @@ save(Obs_Z, X_for_GDM, N_col_XforGDM, row_ind, col_ind, Smp_size, N_sites, R_inv
 #export data to be used to plot results
 Basis_for_geodist <- iSpline(Site_geodist, degree = (Spl_deg - 1), df = Spl_df, intercept = TRUE)
 
-save(I_spl_basisfun, Basis_for_geodist, X_mat, Site_geodist, file = '/MOTIVATE/GDM_ForesteCasentinesi/spGDMM_fold/Data_for_res.RData')
+save(I_spl_basisfun, Basis_for_geodist, X_mat, Site_geodist, fcas_loc_mat, R_spat, Rho_fix, file = '/MOTIVATE/GDM_ForesteCasentinesi/spGDMM_fold/Data_for_res.RData')
 
 rm(Basis_for_geodist)
