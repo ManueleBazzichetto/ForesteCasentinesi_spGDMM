@@ -536,6 +536,74 @@ Fcas_dist.df$Year_chr <- as.character(Fcas_dist.df$Year)
 EVA_forcas_meta <- dplyr::left_join(x = EVA_forcas_meta, y = Fcas_dist.df[c('PlotID', 'TCW', 'Year_chr')], by = c('PlotID', 'Year_chr'))
 
 
+#----------------------------------------import environmental raster layers and bring them all to the same resolution and extent of the coarsest layer
+
+#the idea is to create a stack of raster layers to be used to map the estimated beta-diversity across the study area
+#to do that, we need to bring all layers to the same extent, resolution and so on
+#at the moment, the environmental layer(s) with the coarsest resolution is temperature (1 km at the Equator)
+#so the topographic and TCW layers have to be modified to match that same resolution, extent and so on
+
+#import TCW layers
+TCW_tile_1984 <- rast("TCWData/TCW_1984.tif")
+TCW_tile_2020 <- rast("TCWData/TCW_2020.tif")
+
+#import eastness and slope
+slope_tile <- rast(x = "C:/MOTIVATE/GDM_ForesteCasentinesi/TopographicData/TopoLayers/slope_90M_n30e000/slope_90M_n40e010.tif")
+east_tile <- rast(x = "C:/MOTIVATE/GDM_ForesteCasentinesi/TopographicData/TopoLayers/eastness_90M_n30e000/eastness_90M_n40e010.tif")
+
+#import temperature and precipitation (and apply scale to report them to correct range of values)
+temp_tile_1984 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/tavg/DownscaledTavg1984YearlyAvg_cogeo.tif")
+temp_tile_1984 <- temp_tile_1984/100
+temp_tile_2020 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/tavg/DownscaledTavg2020YearlyAvg_cogeo.tif")
+temp_tile_2020 <- temp_tile_2020/100
+
+prcp_tile_1984 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/prec/DownscaledPrcp1984YearlySum_cogeo.tif")
+prcp_tile_1984 <- prcp_tile_1984/100
+prcp_tile_2020 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/prec/DownscaledPrcp2020YearlySum_cogeo.tif")
+prcp_tile_2020 <- prcp_tile_2020/100
+
+#crop all layers at the extent of FCas_shp
+#check if ext() returns a SpatExtent if x = sf object
+class(ext(FCas_shp)) #Yes
+
+TCW_tile_1984 <- crop(TCW_tile_1984, y = FCas_shp)
+TCW_tile_2020 <- crop(TCW_tile_2020, y = FCas_shp)
+
+slope_tile <- crop(slope_tile, y = FCas_shp)
+east_tile <- crop(east_tile, y = FCas_shp)
+
+temp_tile_1984 <- crop(temp_tile_1984, y = FCas_shp)
+temp_tile_2020 <- crop(temp_tile_2020, y = FCas_shp)
+
+prcp_tile_1984 <- crop(prcp_tile_1984, y = FCas_shp)
+prcp_tile_2020 <- crop(prcp_tile_2020, y = FCas_shp)
+
+#small differences
+lapply(list(TCW_tile_1984, TCW_tile_2020, slope_tile, east_tile, temp_tile_1984, prcp_tile_1984), ext)
+
+#check on output of using resample
+#compareGeom(resample(x = TCW_tile_1984, y = temp_tile_1984, method = 'average'),
+#           temp_tile_1984)
+
+env_stack <- rast(lapply(list(TCW_tile_1984, TCW_tile_2020, slope_tile, east_tile), function(i, lyr = temp_tile_1984) {
+  res <- terra::resample(i, y = lyr, method = 'average')
+  return(res)
+}))
+
+names(env_stack) <- c("TCW_1984", "TCW_2020", "slope", "east")
+
+#combine with temperature and precipitation layer
+env_stack <- c(temp_tile_1984, temp_tile_2020, prcp_tile_1984, prcp_tile_2020, env_stack)
+
+names(env_stack)[1:4] <- c("temp_1984", "temp_2020", "prcp_1984", "prcp_2020")
+
+#mask the layers to overlap the spatial extent of the Foreste Casentinesi
+env_stack <- mask(env_stack, mask = vect(FCas_shp), touches = T)
+
+#coerce the env_stack to a data.frame for further calculations - see DataForGDM
+env_stack_df <- as.data.frame(env_stack, xy = T, na.rm = T)
+
+
 #---------------------------------------saves data for presentations
 
 #these files are not anymore exported at this stage - see DataForGDM

@@ -669,6 +669,78 @@ Rspat_offd_temp <- R_spat[upper.tri(R_spat)]
 
 plot(Site_geodist, Rspat_offd_temp)
 
+
+#------------------Use env_stack.df to derive a new matrix of basis functions to map estimated beta diversity across space
+
+anyNA(env_stack_df) #F
+
+#match name and position of columns in env_stack_df with respect to X_mat
+
+#names(X_mat): "tmean_avg" "prcp_avg" "slope" "east" "TCW"
+
+#dataset for 1984
+env_stack_df_1984 <- env_stack_df[c('temp_1984', 'prcp_1984', 'slope', 'east', 'TCW_1984')]
+colnames(env_stack_df_1984) <- colnames(X_mat)
+
+#dataset for 2020
+env_stack_df_2020 <- env_stack_df[c('temp_2020', 'prcp_2020', 'slope', 'east', 'TCW_2020')]
+colnames(env_stack_df_2020) <- colnames(X_mat)
+
+#check if data to be used to map beta diversity across space are beyond the range of values used to fit spGDMM (X_mat) - Extrapolation
+rng_training <- lapply(X_mat, range)
+#compare against: yes, data for all variables can be outside range of training
+lapply(env_stack_df_1984, range)
+lapply(env_stack_df_2020, range)
+
+#set values outside the range to NA
+set_to_missing <- function(x, rng_to_use) {
+  #extract colnames from x
+  col_nm <- colnames(x)
+  #check colnames and rng_to_use names are the same
+  if(!identical(col_nm, names(rng_to_use))) stop("Colnames and names of range objects do not match")
+  #if they match
+  res <- lapply(col_nm, function(nm) {
+    min_val <- rng_to_use[[nm]][[1]]
+    max_val <- rng_to_use[[nm]][[2]]
+    #set values outside range to NA
+    cl_to_updt <- x[[nm]]
+    cl_to_updt <- ifelse(cl_to_updt >= min_val & cl_to_updt <= max_val, cl_to_updt, NA)
+    return(cl_to_updt)
+  })
+  res <- data.frame(res)
+  colnames(res) <- col_nm
+  return(res)
+  }
+
+env_stack_df_1984 <- set_to_missing(x = env_stack_df_1984, rng_to_use = rng_training)
+
+#count how many cases
+sapply(env_stack_df_1984, function(cl) sum(is.na(cl)))
+
+env_stack_df_2020 <- set_to_missing(x = env_stack_df_2020, rng_to_use = rng_training)
+
+#count how many cases
+sapply(env_stack_df_2020, function(cl) sum(is.na(cl)))
+
+#derive new set of basis functions for 1984
+env_stack_df_1984 <- data.frame(lapply(colnames(X_mat), function(nm) {
+  bs_funs_obs <- iSpline(X_mat[[nm]], degree = (Spl_deg - 1), df = Spl_df, intercept = TRUE)
+  bs_funs_pred <- predict(object = bs_funs_obs, newx = env_stack_df_1984[[nm]])
+  return(bs_funs_pred)
+  }))
+
+#derive new set of basis functions for 2020
+env_stack_df_2020 <- data.frame(lapply(colnames(X_mat), function(nm) {
+  bs_funs_obs <- iSpline(X_mat[[nm]], degree = (Spl_deg - 1), df = Spl_df, intercept = TRUE)
+  bs_funs_pred <- predict(object = bs_funs_obs, newx = env_stack_df_2020[[nm]])
+  return(bs_funs_pred)
+  }))
+
+#re-assign cells' coordinates to data.frames
+env_stack_df_1984 <- data.frame(env_stack_df[c('x', 'y')], env_stack_df_1984)
+
+env_stack_df_2020 <- data.frame(env_stack_df[c('x', 'y')], env_stack_df_2020)
+
 #------------------------------------Export input data to project for fitting spGDMM
 
 #check date of object creation for reference
