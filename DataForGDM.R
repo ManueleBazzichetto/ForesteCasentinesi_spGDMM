@@ -440,6 +440,26 @@ row.names(fcas_spec_mat) <- fcas_spec_mat$ID
 fcas_spec_mat$ID <- NULL
 
 
+#------------------------------------check distribution of habitat types
+
+sum(is.na(Forcas_env$Hab_simpl)) #0
+
+#habitat type is intended as the class at the highest hierarchical level of EUNIS
+Tab_hab_typ <- as.data.frame(table(Forcas_env$Hab_simpl))
+
+Tab_hab_typ$Var1 <- factor(Tab_hab_typ$Var1, levels = as.character(Tab_hab_typ[order(Tab_hab_typ$Freq, decreasing = T), 'Var1']))
+
+Tab_hab_typ_plot <- ggplot(Tab_hab_typ, aes(x = Var1, y = Freq, fill = Var1)) +
+  geom_col() +
+  scale_fill_manual(values = c('Forest' = 'darkgreen', 'Grassland' = 'lightgreen',
+                               'Inland.sparse.veg' = 'gold2', 'Scrub' = 'chocolate4'), name = 'Habitat Type') +
+  ylab('Count') + xlab(NULL) +
+  theme_pubr() +
+  theme(axis.title = element_text(size = 16), axis.text.x.bottom = element_blank(),
+        legend.text = element_text(size = 14), legend.title = element_text(size = 14),
+        legend.position = 'top')
+
+
 #------------------------------------create locality and environmental matrices
 
 fcas_loc_mat <- Forcas_env[c('PlotObservationID', 'lon', 'lat')]
