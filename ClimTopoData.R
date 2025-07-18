@@ -544,8 +544,8 @@ EVA_forcas_meta <- dplyr::left_join(x = EVA_forcas_meta, y = Fcas_dist.df[c('Plo
 #so the topographic and TCW layers have to be modified to match that same resolution, extent and so on
 
 #import TCW layers
-TCW_tile_1984 <- rast("TCWData/TCW_1984.tif")
-TCW_tile_2020 <- rast("TCWData/TCW_2020.tif")
+TCW_tile_1984 <- rast("TCWData/TCW_1984_corrext.tif")
+TCW_tile_2020 <- rast("TCWData/TCW_2020_corrext.tif")
 
 #import eastness and slope
 slope_tile <- rast(x = "C:/MOTIVATE/GDM_ForesteCasentinesi/TopographicData/TopoLayers/slope_90M_n30e000/slope_90M_n40e010.tif")

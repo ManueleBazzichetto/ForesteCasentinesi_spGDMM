@@ -700,7 +700,7 @@ anyNA(env_stack_df) #F
 
 #dataset for 1984
 env_stack_df_1984 <- env_stack_df[c('temp_1984', 'prcp_1984', 'slope', 'east', 'TCW_1984')]
-colnames(env_stack_df_1984) <- colnames(X_mat)
+colnames(env_stack_df_1984) <- colnames(X_mat) #colnames of the stack_df should match name of X_mat cols
 
 #dataset for 2020
 env_stack_df_2020 <- env_stack_df[c('temp_2020', 'prcp_2020', 'slope', 'east', 'TCW_2020')]
