@@ -442,6 +442,8 @@ fcas_spec_mat$ID <- NULL
 
 #------------------------------------check distribution of habitat types
 
+#NOTE THAT THIS MUST BE CORRECTED ONCE THE ISSUE WITH CLASSIFICATION OF FORESTS HAS BEEN FIXED BY EVA PEOPLE
+
 sum(is.na(Forcas_env$Hab_simpl)) #0
 
 #habitat type is intended as the class at the highest hierarchical level of EUNIS
@@ -466,7 +468,7 @@ fcas_loc_mat <- Forcas_env[c('PlotObservationID', 'lon', 'lat')]
 
 colnames(fcas_loc_mat)[1] <- 'ID'
 
-fcas_env_use <- Forcas_env[c('tmean_avg', 'prcp_avg', 'slope', 'east', 'TCW')]
+fcas_env_use <- Forcas_env[c('tmean_avg', 'prcp_avg', 'slope', 'HeatLoad', 'TCW')]
 
 cor(fcas_env_use) # note that redundancy of basis functions could still happen even if cor among predictors is low
 
@@ -691,6 +693,8 @@ plot(Site_geodist, Rspat_offd_temp)
 
 
 #------------------Use env_stack.df to derive a new matrix of basis functions to map estimated beta diversity across space
+
+#TO RE-RUN ADDING SOLAR RADIATION/HEAT LOAD
 
 anyNA(env_stack_df) #F
 

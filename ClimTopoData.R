@@ -535,8 +535,74 @@ Fcas_dist.df$Year_chr <- as.character(Fcas_dist.df$Year)
 
 EVA_forcas_meta <- dplyr::left_join(x = EVA_forcas_meta, y = Fcas_dist.df[c('PlotID', 'TCW', 'Year_chr')], by = c('PlotID', 'Year_chr'))
 
+#----------------------------------------import aspect and compute solar radiation
+
+#import topographic layers - Geomorph90m - Amatulli et al. 2020
+#for info on dates of download and other things, see README in the TopographicData folder
+
+#assuming aspect is in degrees as it goes from 0 to about 360
+aspect_tile <- rast(x = "C:/MOTIVATE/GDM_ForesteCasentinesi/TopographicData/TopoLayers/aspect_90M_n40e010.tif")
+
+#compare aspect_tile with the other topographic layers
+compareGeom(aspect_tile, tri_tile) #T
+
+#extract aspect values at EVA_forcas_meta coordinates
+aspect_values <- terra::extract(aspect_tile, y = EVA_forcas_meta[c('lon', 'lat')])
+
+anyNA(aspect_values) #F
+range(aspect_values$aspect_90M_n40e010) #0.2685165 359.5325623
+
+#drop ID, modify name of aspect values' column and add plot ID
+aspect_values <- data.frame(OriginalID = EVA_forcas_meta[['OriginalID']], aspect = aspect_values$aspect_90M_n40e010)
+
+#join to EVA_forcas_meta
+#prova <- dplyr::left_join(x = EVA_forcas_meta, y = aspect_values, by = 'OriginalID')
+#identical(prova[-length(prova)], EVA_forcas_meta) #T
+EVA_forcas_meta <- dplyr::left_join(x = EVA_forcas_meta, y = aspect_values, by = 'OriginalID')
+
+#use slope, aspect and latitude to compute Solar Radiation
+
+#import function SolarRad from: https://github.com/fmsabatini/SolarRad/blob/main/SolarRad.R
+
+SolarRad <- function(Slope, Aspect, Latitude, Exp=FALSE){
+  if(Slope==0) Aspect=999
+  folded_aspect <- 180-abs(Aspect-180)
+  rlatitude <- Latitude*pi/180                #transform to radians
+  rslope    <- Slope*pi/180
+  rfolded_aspect <- folded_aspect*pi/180
+  SolarRad <- -1.467+1.582*cos(rlatitude)*cos(rslope) - 1.5*cos(rfolded_aspect)*sin(rslope)*sin(rlatitude) -
+    0.262*sin(rlatitude)*sin(rslope) + 0.607*sin(rfolded_aspect)*sin(rslope)
+  if(Exp==T) SolarRad <- exp(SolarRad)
+  
+  folded_aspectNW_SE <- abs(180-abs(Aspect-225))  #transform to radians centered on the SW/NE
+  rfolded_aspectNW_SW <- folded_aspectNW_SE*pi/180
+  HeatLoad <- -1.467+1.582*cos(rlatitude)*cos(rslope) - 1.5*cos(folded_aspectNW_SE)*sin(rslope)*sin(rlatitude) -
+    0.262*sin(rlatitude)*sin(rslope) + 0.607*sin(folded_aspectNW_SE)*sin(rslope)
+  if(Exp==T) HeatLoad <- exp(HeatLoad)
+  return(data.frame(SolarRad, HeatLoad))
+}
+
+SolarRadiation_df <- do.call(rbind, lapply(1:nrow(EVA_forcas_meta), function(i) {
+  res <- SolarRad(Slope = EVA_forcas_meta$slope[i], Aspect = EVA_forcas_meta$aspect[i], Latitude = EVA_forcas_meta$lat[i], Exp = F)
+  res$OriginalID <- EVA_forcas_meta$OriginalID[i]
+  return(res)
+  }))
+
+anyNA(SolarRadiation_df) #F
+
+#join to EVA_forcas_meta
+#prova <- dplyr::left_join(x = EVA_forcas_meta, y = SolarRadiation_df, by = 'OriginalID')
+#identical(prova[-c(length(prova)-1, length(prova))], EVA_forcas_meta) #T
+EVA_forcas_meta <- dplyr::left_join(x = EVA_forcas_meta, y = SolarRadiation_df, by = 'OriginalID')
+
+#check correlation with topographic variables
+#in the end it's probably better if we use heat load, which is nearly orthogonal with other predictors
+#and it has been used in other studies as a proxy of microclimate conditions: https://onlinelibrary.wiley.com/doi/full/10.1111/jvs.13305
+cor(EVA_forcas_meta[c('slope', 'north', 'east', 'tri', 'SolarRad', 'HeatLoad')])
 
 #----------------------------------------import environmental raster layers and bring them all to the same resolution and extent of the coarsest layer
+
+#TO RE-RUN ADDING SOLAR RADIATION/HEAT LOAD
 
 #the idea is to create a stack of raster layers to be used to map the estimated beta-diversity across the study area
 #to do that, we need to bring all layers to the same extent, resolution and so on
