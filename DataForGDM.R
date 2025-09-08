@@ -694,23 +694,21 @@ plot(Site_geodist, Rspat_offd_temp)
 
 #------------------Use env_stack.df to derive a new matrix of basis functions to map estimated beta diversity across space
 
-#TO RE-RUN ADDING SOLAR RADIATION/HEAT LOAD
-
 anyNA(env_stack_df) #F
 
 #match name and position of columns in env_stack_df with respect to X_mat
 
-#names(X_mat): "tmean_avg" "prcp_avg" "slope" "east" "TCW"
+#names(X_mat): "tmean_avg" "prcp_avg" "slope" "HeatLoad" "TCW"
 
 #dataset for 1984
-env_stack_df_1984 <- env_stack_df[c('temp_1984', 'prcp_1984', 'slope', 'east', 'TCW_1984')]
+env_stack_df_1984 <- env_stack_df[c('Tavg_1984', 'Prcp_1984', 'slope', 'HeatLoad', 'TCW_1984')]
 colnames(env_stack_df_1984) <- colnames(X_mat) #colnames of the stack_df should match name of X_mat cols
 
 #dataset for 2020
-env_stack_df_2020 <- env_stack_df[c('temp_2020', 'prcp_2020', 'slope', 'east', 'TCW_2020')]
+env_stack_df_2020 <- env_stack_df[c('Tavg_2020', 'Prcp_2020', 'slope', 'HeatLoad', 'TCW_2020')]
 colnames(env_stack_df_2020) <- colnames(X_mat)
 
-#check if data to be used to map beta diversity across space are beyond the range of values used to fit spGDMM (X_mat) - Extrapolation
+#check if data to be used to map warping functions across space are beyond the range of values used to fit spGDMM (X_mat) - Extrapolation
 rng_training <- lapply(X_mat, range)
 #compare against: yes, data for all variables can be outside range of training
 lapply(env_stack_df_1984, range)
@@ -760,6 +758,14 @@ env_stack_df_2020 <- data.frame(lapply(colnames(X_mat), function(nm) {
   return(bs_funs_pred)
   }))
 
+
+#rename columns of env_stack_df_1984 and env_stack_df_2020
+#here I'm using the same colnames of X_for_GDM as:
+#1) the order of env vars is the same within env_stack_df and X_for_GDM;
+#2) the number of basis per predictor is the same as that the one appearing in X_for_GDM: 3 basis for predictor (a total of 15 excluding 'dist')
+
+colnames(env_stack_df_1984) <- colnames(env_stack_df_2020) <- colnames(X_for_GDM)[1:15]
+
 #re-assign cells' coordinates to data.frames
 env_stack_df_1984 <- data.frame(env_stack_df[c('x', 'y')], env_stack_df_1984)
 
@@ -774,6 +780,13 @@ save(Obs_Z, X_for_GDM, N_col_XforGDM, row_ind, col_ind, Smp_size, N_sites, R_inv
 #export data to be used to plot results
 Basis_for_geodist <- iSpline(Site_geodist, degree = (Spl_deg - 1), df = Spl_df, intercept = TRUE)
 
-save(I_spl_basisfun, Basis_for_geodist, X_mat, Site_geodist, fcas_loc_mat, R_spat, Rho_fix, file = '/MOTIVATE/GDM_ForesteCasentinesi/spGDMM_fold/Data_for_res.RData')
+#Site_geodist is already saved in the Robj above
+save(I_spl_basisfun, Basis_for_geodist, X_mat, fcas_loc_mat, R_spat, Rho_fix, 
+     env_stack_df_1984, env_stack_df_2020, file = '/MOTIVATE/GDM_ForesteCasentinesi/spGDMM_fold/Data_for_res.RData')
 
 rm(Basis_for_geodist)
+
+#save and export temp_layer, which will be used to map the warping functions
+writeRaster(x = temp_layer, filename = '/MOTIVATE/GDM_ForesteCasentinesi/spGDMM_fold/temp_lyr.tif')
+
+

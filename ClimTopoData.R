@@ -4,6 +4,7 @@ library(sf)
 library(mapview)
 library(easyclimate) #installed on Jan 9th 2025 - version 0.2.2
 library(terra)
+library(geosphere)
 library(GGally)
 library(ggplot2)
 library(ggpubr)
@@ -602,30 +603,32 @@ cor(EVA_forcas_meta[c('slope', 'north', 'east', 'tri', 'SolarRad', 'HeatLoad')])
 
 #----------------------------------------import environmental raster layers and bring them all to the same resolution and extent of the coarsest layer
 
-#TO RE-RUN ADDING SOLAR RADIATION/HEAT LOAD
-
-#the idea is to create a stack of raster layers to be used to map the estimated beta-diversity across the study area
+#the idea is to create a stack of raster layers to be used to map the RGB of estimated warping functions across the study area
 #to do that, we need to bring all layers to the same extent, resolution and so on
 #at the moment, the environmental layer(s) with the coarsest resolution is temperature (1 km at the Equator)
 #so the topographic and TCW layers have to be modified to match that same resolution, extent and so on
+#however, as the RGB (as well as the maps of spatial random effects) will be used for visualization only
+#we'll force the layers to have a resolution that allows showing spatial patterns, such as 250 m
+#this means that the climatic layers will be forced to have a better resolution than they actually have
 
 #import TCW layers
 TCW_tile_1984 <- rast("TCWData/TCW_1984_corrext.tif")
 TCW_tile_2020 <- rast("TCWData/TCW_2020_corrext.tif")
 
-#import eastness and slope
+#import eastness, slope and aspect
 slope_tile <- rast(x = "C:/MOTIVATE/GDM_ForesteCasentinesi/TopographicData/TopoLayers/slope_90M_n30e000/slope_90M_n40e010.tif")
 east_tile <- rast(x = "C:/MOTIVATE/GDM_ForesteCasentinesi/TopographicData/TopoLayers/eastness_90M_n30e000/eastness_90M_n40e010.tif")
+aspect_tile <- rast(x = "C:/MOTIVATE/GDM_ForesteCasentinesi/TopographicData/TopoLayers/aspect_90M_n40e010.tif")
 
 #import temperature and precipitation (and apply scale to report them to correct range of values)
-temp_tile_1984 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/tavg/DownscaledTavg1984YearlyAvg_cogeo.tif")
+temp_tile_1984 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/tavg/DownscaledTavg1984YearlyAvg_cogeo.tif")
 temp_tile_1984 <- temp_tile_1984/100
-temp_tile_2020 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/tavg/DownscaledTavg2020YearlyAvg_cogeo.tif")
+temp_tile_2020 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/tavg/DownscaledTavg2020YearlyAvg_cogeo.tif")
 temp_tile_2020 <- temp_tile_2020/100
 
-prcp_tile_1984 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/prec/DownscaledPrcp1984YearlySum_cogeo.tif")
+prcp_tile_1984 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/prec/DownscaledPrcp1984YearlySum_cogeo.tif")
 prcp_tile_1984 <- prcp_tile_1984/100
-prcp_tile_2020 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/prec/DownscaledPrcp2020YearlySum_cogeo.tif")
+prcp_tile_2020 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/prec/DownscaledPrcp2020YearlySum_cogeo.tif")
 prcp_tile_2020 <- prcp_tile_2020/100
 
 #crop all layers at the extent of FCas_shp
@@ -637,6 +640,7 @@ TCW_tile_2020 <- crop(TCW_tile_2020, y = FCas_shp)
 
 slope_tile <- crop(slope_tile, y = FCas_shp)
 east_tile <- crop(east_tile, y = FCas_shp)
+aspect_tile <- crop(aspect_tile, y = FCas_shp)
 
 temp_tile_1984 <- crop(temp_tile_1984, y = FCas_shp)
 temp_tile_2020 <- crop(temp_tile_2020, y = FCas_shp)
@@ -644,24 +648,87 @@ temp_tile_2020 <- crop(temp_tile_2020, y = FCas_shp)
 prcp_tile_1984 <- crop(prcp_tile_1984, y = FCas_shp)
 prcp_tile_2020 <- crop(prcp_tile_2020, y = FCas_shp)
 
+#----use aspect and slope to compute the heat load layer
+heatload_tile_df <- as.data.frame(c(aspect_tile, slope_tile), xy = T)
+
+nrow(heatload_tile_df) == ncell(aspect_tile)
+
+#update col names
+colnames(heatload_tile_df)[c(3, 4)] <- c('aspect', 'slope')
+
+#check NAs
+anyNA(heatload_tile_df[c(3, 4)]) #F
+
+#compute heat load on whole layer
+heatload_tile_df$heatload <- sapply(seq_len(nrow(heatload_tile_df)), function(i) {
+  asp_val <- heatload_tile_df[i, 'aspect']
+  sl_val <- heatload_tile_df[i, 'slope']
+  lat_val <- heatload_tile_df[i, 'y']
+  res <- SolarRad(Slope = sl_val, Aspect = asp_val, Latitude = lat_val, Exp = F)
+  res <- res[['HeatLoad']] 
+  return(res)
+})
+
+#create heat load layer
+heatload_tile <- terra::rasterize(x = heatload_tile_df[c(1, 2)], y = aspect_tile, values = heatload_tile_df$heatload)
+
+#check geometry comparison
+compareGeom(heatload_tile, aspect_tile) #T
+
+#----create template layer
+
+#create template layer in EPSG:32632
+temp_layer <- rast(crs = 'epsg:32632', extent = ext(st_transform(FCas_shp, crs = 32632)))
+
+#transfor resolution so that it is 250 m
+res(temp_layer) <- c(250, 250)
+
+#give it fake values values
+temp_layer[] <- 1
+
+#project temp_layer to epsg:4326
+temp_layer <- project(x = temp_layer, y = 'epsg:4326', method = 'bilinear')
+
+#check what's the new resolution (from longlat to m)
+temp_layer_df <- as.data.frame(temp_layer, xy = T)
+
+#min longitude and mean lat: 206.4225
+distm(rbind(c(min(temp_layer_df$x), mean(temp_layer_df$y)), c(min(temp_layer_df$x) + res(temp_layer)[1], mean(temp_layer_df$y))))
+
+#max and mean lat: 206.4225
+distm(rbind(c(max(temp_layer_df$x), mean(temp_layer_df$y)), c(max(temp_layer_df$x) + res(temp_layer)[1], mean(temp_layer_df$y))))
+
+#mean lat at mean long (distortion should not affect lat at all over long): 285.3401
+distm(rbind(c(mean(temp_layer_df$x), mean(temp_layer_df$y)), c(mean(temp_layer_df$x), mean(temp_layer_df$y) + res(temp_layer)[1])))
+
+#check how the ney layer overlaps with FCas perimeter
+plot(temp_layer)
+plot(st_geometry(FCas_shp), add = T)
+
+#----report all layers to the same resolution as temp_layer
+
 #small differences
-lapply(list(TCW_tile_1984, TCW_tile_2020, slope_tile, east_tile, temp_tile_1984, prcp_tile_1984), ext)
+lapply(list(TCW_tile_1984, TCW_tile_2020, slope_tile, east_tile, heatload_tile, temp_tile_1984, prcp_tile_1984, temp_layer), ext)
 
 #check on output of using resample
 #compareGeom(resample(x = TCW_tile_1984, y = temp_tile_1984, method = 'average'),
 #           temp_tile_1984)
 
-env_stack <- rast(lapply(list(TCW_tile_1984, TCW_tile_2020, slope_tile, east_tile), function(i, lyr = temp_tile_1984) {
+#I'm resampling all layers, including the climatic ones, but it could be useful to adopt another strategy for the climatic layers,
+#whose resolution is way larger than that of temp_layer [TO CHECK!]
+env_stack <- rast(lapply(list(temp_tile_1984, temp_tile_2020, prcp_tile_1984, prcp_tile_2020,
+                              TCW_tile_1984, TCW_tile_2020, slope_tile, heatload_tile), function(i, lyr = temp_layer) {
   res <- terra::resample(i, y = lyr, method = 'average')
   return(res)
 }))
 
-names(env_stack) <- c("TCW_1984", "TCW_2020", "slope", "east")
+names(env_stack) <- c("Tavg_1984", "Tavg_2020", "Prcp_1984", "Prcp_2020",
+                      "TCW_1984", "TCW_2020", "slope", "HeatLoad")
 
 #combine with temperature and precipitation layer
-env_stack <- c(temp_tile_1984, temp_tile_2020, prcp_tile_1984, prcp_tile_2020, env_stack)
+#env_stack <- c(temp_tile_1984, temp_tile_2020, prcp_tile_1984, prcp_tile_2020, env_stack)
 
-names(env_stack)[1:4] <- c("temp_1984", "temp_2020", "prcp_1984", "prcp_2020")
+#names(env_stack)[1:4] <- c("temp_1984", "temp_2020", "prcp_1984", "prcp_2020")
 
 #mask the layers to overlap the spatial extent of the Foreste Casentinesi
 env_stack <- mask(env_stack, mask = vect(FCas_shp), touches = T)
