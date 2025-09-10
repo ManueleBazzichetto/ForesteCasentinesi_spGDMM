@@ -610,6 +610,8 @@ cor(EVA_forcas_meta[c('slope', 'north', 'east', 'tri', 'SolarRad', 'HeatLoad')])
 #however, as the RGB (as well as the maps of spatial random effects) will be used for visualization only
 #we'll force the layers to have a resolution that allows showing spatial patterns, such as 250 m
 #this means that the climatic layers will be forced to have a better resolution than they actually have
+#important note: the resolution of the layer cannot be too fine as this would imply sampling GP realizations
+#from an high dimension mvnorm
 
 #import TCW layers
 TCW_tile_1984 <- rast("TCWData/TCW_1984_corrext.tif")
@@ -680,10 +682,10 @@ compareGeom(heatload_tile, aspect_tile) #T
 #create template layer in EPSG:32632
 temp_layer <- rast(crs = 'epsg:32632', extent = ext(st_transform(FCas_shp, crs = 32632)))
 
-#transfor resolution so that it is 250 m
-res(temp_layer) <- c(250, 250)
+#set resolution to 400 m, so that sampling from mvrnorm is feasible
+res(temp_layer) <- c(400, 400)
 
-#give it fake values values
+#give it fake values values (not strictly needed)
 temp_layer[] <- 1
 
 #project temp_layer to epsg:4326
@@ -692,13 +694,13 @@ temp_layer <- project(x = temp_layer, y = 'epsg:4326', method = 'bilinear')
 #check what's the new resolution (from longlat to m)
 temp_layer_df <- as.data.frame(temp_layer, xy = T)
 
-#min longitude and mean lat: 206.4225
+#min longitude and mean lat: 329.8845
 distm(rbind(c(min(temp_layer_df$x), mean(temp_layer_df$y)), c(min(temp_layer_df$x) + res(temp_layer)[1], mean(temp_layer_df$y))))
 
-#max and mean lat: 206.4225
+#max and mean lat: 329.8845
 distm(rbind(c(max(temp_layer_df$x), mean(temp_layer_df$y)), c(max(temp_layer_df$x) + res(temp_layer)[1], mean(temp_layer_df$y))))
 
-#mean lat at mean long (distortion should not affect lat at all over long): 285.3401
+#mean lat at mean long (distortion should not affect lat at all over long): 456.0014
 distm(rbind(c(mean(temp_layer_df$x), mean(temp_layer_df$y)), c(mean(temp_layer_df$x), mean(temp_layer_df$y) + res(temp_layer)[1])))
 
 #check how the ney layer overlaps with FCas perimeter
