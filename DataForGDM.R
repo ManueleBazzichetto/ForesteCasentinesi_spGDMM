@@ -694,7 +694,7 @@ plot(Site_geodist, Rspat_offd_temp)
 
 #------------------Use env_stack.df to derive a new matrix of basis functions to map estimated beta diversity across space
 
-anyNA(env_stack_df) #F
+anyNA(env_stack_df) #T
 
 #match name and position of columns in env_stack_df with respect to X_mat
 
@@ -703,10 +703,19 @@ anyNA(env_stack_df) #F
 #dataset for 1984
 env_stack_df_1984 <- env_stack_df[c('Tavg_1984', 'Prcp_1984', 'slope', 'HeatLoad', 'TCW_1984')]
 colnames(env_stack_df_1984) <- colnames(X_mat) #colnames of the stack_df should match name of X_mat cols
+#remove NAs now - this avoids having some NAs in a period (1984 or 2020) affecting missing values in the other
+#if layers have NAs only in time-invariant layers, then NA can be removed when creating env_stack_df
+na_pos_1984 <- which(complete.cases(env_stack_df_1984))
+#note that this is the first stage in which gaps are introduced in the map of estimated warping functions
+#for example, the TCW layers have 5 missing values (due to their smaller ext) at the bottom-right of their ext
+#these NAs will propagate to the other layers, even if they don't have NAs at these cells
+env_stack_df_1984 <- na.omit(env_stack_df_1984)
 
 #dataset for 2020
 env_stack_df_2020 <- env_stack_df[c('Tavg_2020', 'Prcp_2020', 'slope', 'HeatLoad', 'TCW_2020')]
 colnames(env_stack_df_2020) <- colnames(X_mat)
+na_pos_2020 <- which(complete.cases(env_stack_df_2020))
+env_stack_df_2020 <- na.omit(env_stack_df_2020)
 
 #check if data to be used to map warping functions across space are beyond the range of values used to fit spGDMM (X_mat) - Extrapolation
 rng_training <- lapply(X_mat, range)
@@ -733,6 +742,13 @@ set_to_missing <- function(x, rng_to_use) {
   colnames(res) <- col_nm
   return(res)
   }
+
+#this is the second stage where NAs are introduced in the map of estimated warping functions
+#NAs will be introduced to avoid extrapolation (see below). These will propagate in the computation of the
+#warping functions in each new location
+
+#if I set predictors' values outside the range of training dataset to NA, I'll likely have
+#(many) gaps on the map of the estimated warping functions
 
 env_stack_df_1984 <- set_to_missing(x = env_stack_df_1984, rng_to_use = rng_training)
 
@@ -767,9 +783,11 @@ env_stack_df_2020 <- data.frame(lapply(colnames(X_mat), function(nm) {
 colnames(env_stack_df_1984) <- colnames(env_stack_df_2020) <- colnames(X_for_GDM)[1:15]
 
 #re-assign cells' coordinates to data.frames
-env_stack_df_1984 <- data.frame(env_stack_df[c('x', 'y')], env_stack_df_1984)
+identical(na_pos_1984, na_pos_2020) #T
 
-env_stack_df_2020 <- data.frame(env_stack_df[c('x', 'y')], env_stack_df_2020)
+env_stack_df_1984 <- data.frame(env_stack_df[na_pos_1984, c('x', 'y')], env_stack_df_1984)
+
+env_stack_df_2020 <- data.frame(env_stack_df[na_pos_2020, c('x', 'y')], env_stack_df_2020)
 
 #------------------------------------Export input data to project for fitting spGDMM
 

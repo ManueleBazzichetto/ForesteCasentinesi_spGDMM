@@ -623,14 +623,53 @@ east_tile <- rast(x = "C:/MOTIVATE/GDM_ForesteCasentinesi/TopographicData/TopoLa
 aspect_tile <- rast(x = "C:/MOTIVATE/GDM_ForesteCasentinesi/TopographicData/TopoLayers/aspect_90M_n40e010.tif")
 
 #import temperature and precipitation (and apply scale to report them to correct range of values)
+#to avoid relying on the layer of a single year for temperature and precipitation, I'll create a layer
+#that is the average of multiple layers
+
+temp_tile_1982 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/tavg/DownscaledTavg1982YearlyAvg_cogeo.tif")
+temp_tile_1983 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/tavg/DownscaledTavg1983YearlyAvg_cogeo.tif")
 temp_tile_1984 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/tavg/DownscaledTavg1984YearlyAvg_cogeo.tif")
+temp_tile_1985 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/tavg/DownscaledTavg1985YearlyAvg_cogeo.tif")
+temp_tile_1986 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/tavg/DownscaledTavg1986YearlyAvg_cogeo.tif")
+
+#I'm going to name the mean temp as temp_tile_1984 as this corresponds to t0 - the center of the 'temporal' window
+temp_tile_1984 <- mean(c(temp_tile_1982, temp_tile_1983, temp_tile_1984, temp_tile_1985, temp_tile_1986))
+
+#apply scale
 temp_tile_1984 <- temp_tile_1984/100
+
+#same thing for temp, t1
+temp_tile_2018 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/tavg/DownscaledTavg2018YearlyAvg_cogeo.tif")
+temp_tile_2019 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/tavg/DownscaledTavg2019YearlyAvg_cogeo.tif")
 temp_tile_2020 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/tavg/DownscaledTavg2020YearlyAvg_cogeo.tif")
+temp_tile_2021 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/tavg/DownscaledTavg2021YearlyAvg_cogeo.tif")
+temp_tile_2022 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/tavg/DownscaledTavg2022YearlyAvg_cogeo.tif")
+
+temp_tile_2020 <- mean(c(temp_tile_2018, temp_tile_2019, temp_tile_2020, temp_tile_2021, temp_tile_2022))
+
 temp_tile_2020 <- temp_tile_2020/100
 
+#same thing for precip
+
+prcp_tile_1982 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/prec/DownscaledPrcp1982YearlySum_cogeo.tif")
+prcp_tile_1983 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/prec/DownscaledPrcp1983YearlySum_cogeo.tif")
 prcp_tile_1984 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/prec/DownscaledPrcp1984YearlySum_cogeo.tif")
+prcp_tile_1985 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/prec/DownscaledPrcp1985YearlySum_cogeo.tif")
+prcp_tile_1986 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/prec/DownscaledPrcp1986YearlySum_cogeo.tif")
+
+prcp_tile_1984 <- mean(c(prcp_tile_1982, prcp_tile_1983, prcp_tile_1984, prcp_tile_1985, prcp_tile_1986))
+
 prcp_tile_1984 <- prcp_tile_1984/100
+
+
+prcp_tile_2018 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/prec/DownscaledPrcp2018YearlySum_cogeo.tif")
+prcp_tile_2019 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/prec/DownscaledPrcp2019YearlySum_cogeo.tif")
 prcp_tile_2020 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/prec/DownscaledPrcp2020YearlySum_cogeo.tif")
+prcp_tile_2021 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/prec/DownscaledPrcp2021YearlySum_cogeo.tif")
+prcp_tile_2022 <- rast(x = "C:/MOTIVATE/GDM_EuropeanEcoregions/EasyClimateData/v4data_from_ftpzilla/prec/DownscaledPrcp2022YearlySum_cogeo.tif")
+
+prcp_tile_2020 <- mean(c(prcp_tile_2018, prcp_tile_2019, prcp_tile_2020, prcp_tile_2021, prcp_tile_2022))
+
 prcp_tile_2020 <- prcp_tile_2020/100
 
 #crop all layers at the extent of FCas_shp
@@ -691,16 +730,24 @@ temp_layer[] <- 1
 #project temp_layer to epsg:4326
 temp_layer <- project(x = temp_layer, y = 'epsg:4326', method = 'bilinear')
 
-#check what's the new resolution (from longlat to m)
-temp_layer_df <- as.data.frame(temp_layer, xy = T)
+#see effect of projection
+plot(temp_layer)
 
-#min longitude and mean lat: 329.8845
+#give it fake values values (not strictly needed)
+temp_layer[] <- 1
+
+#check what's the new resolution (from longlat to m)
+#NA should not be dropped otherwise the computation of the resolution changes depending 
+#on the presence of NAs - small changes to mean latitude or longitude are introduced
+temp_layer_df <- as.data.frame(temp_layer, xy = T, na.rm = F)
+
+#min longitude and mean lat: 329.8901
 distm(rbind(c(min(temp_layer_df$x), mean(temp_layer_df$y)), c(min(temp_layer_df$x) + res(temp_layer)[1], mean(temp_layer_df$y))))
 
-#max and mean lat: 329.8845
+#max and mean lat: 329.8901
 distm(rbind(c(max(temp_layer_df$x), mean(temp_layer_df$y)), c(max(temp_layer_df$x) + res(temp_layer)[1], mean(temp_layer_df$y))))
 
-#mean lat at mean long (distortion should not affect lat at all over long): 456.0014
+#mean lat at mean long (distortion should not affect lat at all over long): 456.0013
 distm(rbind(c(mean(temp_layer_df$x), mean(temp_layer_df$y)), c(mean(temp_layer_df$x), mean(temp_layer_df$y) + res(temp_layer)[1])))
 
 #check how the ney layer overlaps with FCas perimeter
@@ -709,7 +756,9 @@ plot(st_geometry(FCas_shp), add = T)
 
 #----report all layers to the same resolution as temp_layer
 
-#small differences
+#small differences - these small differences can anyway result in a different number of NAs for some tiles of some layers
+#for instance, TCW has a different ext than the other layers. This can be checked before masking env_stack.
+#the difference in ext results in some layers having more NAs (e.g. TCW has a bunch of NAs more at the bottom-right of its ext)
 lapply(list(TCW_tile_1984, TCW_tile_2020, slope_tile, east_tile, heatload_tile, temp_tile_1984, prcp_tile_1984, temp_layer), ext)
 
 #check on output of using resample
@@ -736,7 +785,10 @@ names(env_stack) <- c("Tavg_1984", "Tavg_2020", "Prcp_1984", "Prcp_2020",
 env_stack <- mask(env_stack, mask = vect(FCas_shp), touches = T)
 
 #coerce the env_stack to a data.frame for further calculations - see DataForGDM
-env_stack_df <- as.data.frame(env_stack, xy = T, na.rm = T)
+#I'm not deleting NA at this stage as otherwise they would propagate among periods
+#As an example, an NAs in Tavg_1984 not appearing in the other layers would influence
+#all other layers if na.rm = T
+env_stack_df <- as.data.frame(env_stack, xy = T, na.rm = F)
 
 
 #---------------------------------------saves data for presentations
